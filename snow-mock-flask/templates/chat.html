@@ -26,7 +26,6 @@
         main {
             padding: 20px 15px;
             display: flex;
-
         }
         header {
             flex-direction: row;
@@ -34,12 +33,12 @@
             box-shadow: 0 1px 5px 0 #00000033;
         }
         .sticky{
-            position: sticky;   /* makes it stick */
-            top: 0;             /* sticks to the top */
+            position: sticky;
+            top: 0;
             background-color: #fff;
             padding: 15px 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 999;       /* keeps it above content */
+            z-index: 999;
         }
         main {
             flex-direction: column;
@@ -96,6 +95,12 @@
             border-bottom: 1px solid #E8E8E8;
             padding-bottom: 15px;
         }
+        .assistant-bubble {
+            width: 100%;
+            font-size: 15px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
         .assistant-content {
             width: 100%;
             font-size: 15px;
@@ -150,6 +155,27 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 0;
+        }
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #aaa;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
         }
     </style>
 </head>
@@ -164,14 +190,25 @@
         </a>
     </header>
 
-        <div class="chat-container" id="chat-container">
-        <!-- Chat messages will be dynamically added here -->
+    <!-- Jinja-rendered messages (for initial page load / server-side rendering) -->
+    <div class="chat-container" id="chat-container">
+        {% if userMessage %}
+        <div class="message-wrapper user-wrapper">
+            <div class="user-bubble">{{ userMessage }}</div>
+        </div>
+        {% endif %}
+
+        {% if assistantMessage %}
+        <div class="message-wrapper assistant-wrapper">
+            <div class="assistant-bubble" id="assistant-response">{{ assistantMessage }}</div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="input-area">
         <div class="input-wrapper">
             <input type="text" id="chat-input" placeholder="How can I help?" required>
-            <div class="send-btn" id="send-btn">↑</div>
+            <div class="send-btn" id="send-btn">→</div>
         </div>
     </div>
 
@@ -180,59 +217,94 @@
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
 
-        // Function to add a message to the chat
+        // Add a message bubble to the chat
         function addMessage(content, isUser = true) {
-            const messageWrapper = document.createElement('div');
-            messageWrapper.classList.add('message-wrapper', isUser ? 'user-wrapper' : 'assistant-wrapper');
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('message-wrapper', isUser ? 'user-wrapper' : 'assistant-wrapper');
 
-            const messageBubble = document.createElement('div');
-            messageBubble.classList.add(isUser ? 'user-bubble' : 'assistant-bubble');
-            messageBubble.textContent = content;
+            const bubble = document.createElement('div');
+            bubble.classList.add(isUser ? 'user-bubble' : 'assistant-bubble');
 
-            messageWrapper.appendChild(messageBubble);
-            chatContainer.appendChild(messageWrapper);
-            chatContainer.scrollTop = chatContainer.scrollHeight; // Scroll to the bottom
+            // For assistant messages, allow HTML (links, formatting, emojis)
+            if (isUser) {
+                bubble.textContent = content;
+            } else {
+                bubble.innerHTML = content;
+            }
+
+            wrapper.appendChild(bubble);
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // Function to handle sending a message
+        // Show typing indicator
+        function showTyping() {
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('message-wrapper', 'assistant-wrapper');
+            wrapper.id = 'typing-indicator';
+
+            wrapper.innerHTML = `
+                <div class="typing-indicator">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Remove typing indicator
+        function hideTyping() {
+            const el = document.getElementById('typing-indicator');
+            if (el) el.remove();
+        }
+
+        // Send message via AJAX, parse the Jinja-rendered HTML response
         async function sendMessage() {
             const userMessage = chatInput.value.trim();
             if (!userMessage) return;
 
-            // Add the user's message to the chat
             addMessage(userMessage, true);
             chatInput.value = '';
-            console.log("daadadaadadsadadas")
-
+            showTyping();
 
             try {
-                // Send the message to the server
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: userMessage })
                 });
-                console.log(response.json())
-                if (response.ok) {
-                    const data = await response.json();
-                    const assistantMessage = data.response || 'No response from assistant.';
-                    addMessage(assistantMessage, false);
+
+                // Backend returns rendered HTML — parse it to extract the assistant message
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                hideTyping();
+
+                // Find the assistant response element in the rendered HTML
+                const assistantEl = doc.getElementById('assistant-response');
+
+                if (assistantEl) {
+                    addMessage(assistantEl.innerHTML, false);
                 } else {
-                    addMessage('Error: Unable to get a response.', false);
+                    // Fallback: try to find any assistant-bubble
+                    const bubbles = doc.querySelectorAll('.assistant-bubble');
+                    if (bubbles.length > 0) {
+                        addMessage(bubbles[bubbles.length - 1].innerHTML, false);
+                    } else {
+                        addMessage('No response from assistant.', false);
+                    }
                 }
+
             } catch (error) {
+                hideTyping();
                 addMessage('Error: Unable to connect to the server.', false);
             }
         }
 
-        // Event listener for the send button
         sendBtn.addEventListener('click', sendMessage);
-
-        // Event listener for pressing Enter in the input field
         chatInput.addEventListener('keypress', (event) => {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
+            if (event.key === 'Enter') sendMessage();
         });
     </script>
 </body>
