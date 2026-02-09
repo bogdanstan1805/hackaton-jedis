@@ -164,64 +164,76 @@
         </a>
     </header>
 
-    <div class="chat-container">
-        <div class="message-wrapper user-wrapper">
-            <div class="user-bubble">
-                we have a problem with a TPP RetailPay, we receive reports mTLS handshake failure on POST /v1/psd2/token.
-            </div>
-        </div>
-        <div class="message-wrapper assistant-wrapper">
-            <div class="assistant-content">
-                Ok, let’s take it step by step.<br>
-                I don’t find an incident opened in the last 3 hours in this topic.<br><br>
-                Let’s try to gather more information, to be able to be more precise in our search.<br><br>
-                1. Do we know who is the caller of the endpoint?<br>
-                2. To be able to establish the severity of this issue, I would need to know how many calls have been failing in the past 24h / 12h / last hour.<br>
-                3. Do you have a traceId that I could search for?
-            </div>
-        </div>
-        <div class="message-wrapper user-wrapper">
-            <div class="user-bubble">the caller is unknown</div>
-        </div>
-        <div class="message-wrapper user-wrapper">
-            <div class="user-bubble">Around 1000 calls are failing in the last 5 minutes.</div>
-        </div>
-        <div class="message-wrapper assistant-wrapper">
-            <div class="assistant-content">
-                I found 2 recent incidents on the same topic.<br><br>
-
-                <div class="incident-card">
-                    <a href="#" class="incident-id">INC0013012</a>
-                    TPP WalletX is experiencing mTLS handshake failure (unknown_ca) when calling POST /v1/psd2/token.<br>
-                    <b>Duration until fixed:</b> 30 minutes.<br>
-                    <b>Root cause:</b> The TPP renewed the certificate without onboarding it.<br>
-                    <b>Resolution:</b> Correlating the TLS details and TPP IDs.
-                </div>
-
-                <div class="incident-card">
-                    <a href="#" class="incident-id">INC0013019</a>
-                    TPP mTLS handshake failure (unknown_ca) on POST /v1/psd2/token for FinTechOne.<br>
-                    <b>Duration until fixed:</b> 2 hours.<br>
-                    <b>Root cause:</b> TPP had the certificate expired.<br>
-                    <b>Resolution:</b> The TPP needed to renew the certificate and then onboard it.
-                </div>
-
-                <p>If you don’t find this information helpful enough, I could try doing a deep search.<br>
-                    Please provide me the following information:</p>
-                <ul>
-                    <li>traceId;</li>
-                    <li>Exact time interval in which the problem occured.</li>
-                </ul>
-            </div>
-        </div>
+        <div class="chat-container" id="chat-container">
+        <!-- Chat messages will be dynamically added here -->
     </div>
 
     <div class="input-area">
         <div class="input-wrapper">
-            <span class="icon-btn">📎</span>
-            <input type="text" placeholder="How can I help?">
-            <div class="send-btn">↑</div>
+            <input type="text" id="chat-input" placeholder="How can I help?" required>
+            <div class="send-btn" id="send-btn">↑</div>
         </div>
     </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Function to add a message to the chat
+        function addMessage(content, isUser = true) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.classList.add('message-wrapper', isUser ? 'user-wrapper' : 'assistant-wrapper');
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add(isUser ? 'user-bubble' : 'assistant-bubble');
+            messageBubble.textContent = content;
+
+            messageWrapper.appendChild(messageBubble);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight; // Scroll to the bottom
+        }
+
+        // Function to handle sending a message
+        async function sendMessage() {
+            const userMessage = chatInput.value.trim();
+            if (!userMessage) return;
+
+            // Add the user's message to the chat
+            addMessage(userMessage, true);
+            chatInput.value = '';
+            console.log("daadadaadadsadadas")
+
+
+            try {
+                // Send the message to the server
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
+                console.log(response.json())
+                if (response.ok) {
+                    const data = await response.json();
+                    const assistantMessage = data.response || 'No response from assistant.';
+                    addMessage(assistantMessage, false);
+                } else {
+                    addMessage('Error: Unable to get a response.', false);
+                }
+            } catch (error) {
+                addMessage('Error: Unable to connect to the server.', false);
+            }
+        }
+
+        // Event listener for the send button
+        sendBtn.addEventListener('click', sendMessage);
+
+        // Event listener for pressing Enter in the input field
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
 </body>
 </html>
