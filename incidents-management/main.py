@@ -1,164 +1,173 @@
+import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain_ollama import OllamaEmbeddings
+from ollama import Client
+
 from langchain_ollama import ChatOllama
 from langchain.tools import tool
-from langchain.messages import AIMessage
+from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
+from langchain_classic.prompts import ChatPromptTemplate
 
-from langchain_core.prompts import PromptTemplate
+from flask import Flask, request, jsonify
 
+app = Flask(__name__)
 
-# Function to generate a creative short description
-def generate_short_description(query):
-    # Define the prompt template
-    template = """
-    You are an AI assistant tasked with creating a summarized and creative short description for an incident report.
-    Based on the following query, generate a concise and engaging short description:
+# ============================================================
+# LOAD CSV
+# ============================================================
 
-    Query: {query}
-
-    Short Description:
-    """
-    prompt = PromptTemplate(input_variables=["query"], template=template)
-
-    # Initialize the language model (replace with your preferred model)
-    llm = ChatOllama(model="llama3")  # Ensure you have access to this model
-
-    # Generate the short description
-    short_description = llm.invoke(prompt.format(query=query))
-    return short_description.text.strip()
+df = pd.read_csv("incidents.csv")
+emb_cols = [c for c in df.columns if c.startswith("emb_")]
+EMB_DIM = len(emb_cols)
+emb_matrix = df[emb_cols].to_numpy(dtype=np.float32)
 
 
-# Function to create a new incident
-def create_new_incident(file_path, query):
-    short_description = generate_short_description(query)
-    comments = "Generated incident based on user query."
+# ============================================================
+# EMBEDDING CLIENT
+# ============================================================
 
-    # Append the new incident to the CSV file
-    append_to_csv(file_path, short_description, comments)
-    print(f"New incident created with short description: {short_description}")
-
-# Load incidents from CSV
-def load_incidents(file_path):
-    df = pd.read_csv(file_path)
-    df['combined_text'] = df['short_description'] + " " + df['comments']
-    return df
-
-def find_match_with_ollama(query, df, model):
-    # Initialize Ollama embeddings
-    ollama = OllamaEmbeddings(model=model)
-
-    # Generate query embedding
-    query_embedding = ollama.embed_query(query)
-
-    # Generate embeddings for the dataset
-    df["embedding"] = df["combined_text"].apply(lambda x: ollama.embed_query(x))
-
-    # Calculate similarities
-    similarities = df["embedding"].apply(lambda x: cosine_similarity([query_embedding], [x])[0][0])
-    max_similarity = similarities.max()
-
-    print(max_similarity)
-
-    if max_similarity > 0.7:  # Threshold for a useful match
-        best_match_index = similarities.idxmax()
-        return df.iloc[best_match_index][['number', 'short_description', 'comments']], max_similarity
-    return None, max_similarity
+client = Client()
+EMBED_MODEL = "nomic-embed-text"
 
 
-# Append a new incident to the CSV file
-def append_to_csv(file_path, short_description, comments):
-    df = pd.read_csv(file_path)
-    new_row = {
-        'number': f'NEW_INC_{len(df) + 1}',
-        'short_description': short_description,
-        'comments': comments
-    }
-    df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-    df.to_csv(file_path, index=False)
+def embed_query(text: str) -> np.ndarray:
+    resp = client.embeddings(model=EMBED_MODEL, prompt=text)
+    vec = np.array(resp["embedding"], dtype=np.float32)
+    if vec.shape[0] != EMB_DIM:
+        raise ValueError("Embedding dimension mismatch")
+    return vec.reshape(1, -1)
+
+
+# ============================================================
+# TOOLS
+# ============================================================
+
+@tool
+def get_incident_by_id(incident_number: str) -> dict:
+    """Return an incident based on its 'number' column."""
+    row = df[df["number"].astype(str) == incident_number]
+    if row.empty:
+        return {"error": f"Incident {incident_number} not found"}
+    return row.iloc[0].to_dict()
 
 
 @tool
-def initialize_search():
-    """
-    Search for a incident that is similar to the user query.
-    If a match is found, return the incident details.
-    If no match is found, ask the user for more information and try again up to three times.
-    If still no match is found after three attempts, create a new incident with the provided information.
-    Args:
-        Incident number:
-        Short Description:
-        TraceId:
-    """
-    return True
+def semantic_search(query: str, k: int = 5) -> list:
+    """Semantic search over incident embeddings."""
+    qvec = embed_query(query)
+    sims = cosine_similarity(qvec, emb_matrix)[0]
+    top_idx = np.argsort(-sims)[:k]
 
-# Main function
-def main():
-    file_path = 'incidents.csv'  # Path to your CSV file
-    df = load_incidents(file_path)
-
-    llm = ChatOllama(
-        model="gpt-oss:20b",
-        validate_model_on_init=True,
-        temperature=0,
-    ).bind_tools([initialize_search])
-
-    while True:
-        prompt = input()
-        messages = [
-            (
-                "system",
-                "You are a helpful assistant that translates English to French. Translate the user sentence.",
-            ),
-            ("human", "I love programming."),
-        ]
-        result = llm.invoke(
-            messages
-        )
-        print(result.content)
-        # if isinstance(result, AIMessage) and result.tool_calls:
-        #     print(result.tool_calls)
+    return [
+        {
+            "number": str(df.iloc[i]["number"]),
+            "short_description": df.iloc[i].get("short_description", ""),
+            "priority": int(df.iloc[i].get("priority", -1)),
+            "assignment_group": df.iloc[i].get("assignment_group", ""),
+            "similarity": float(sims[i]),
+        }
+        for i in top_idx
+    ]
 
 
-    # print("Welcome! I’m here to help you find or add incidents.")
-    # while True:
-    #     query = input("\nWhat’s your query? (Type 'exit' to quit): ")
-    #     if query.lower() == 'exit':
-    #         print("Goodbye!")
-    #         break
-    #
-    #     tries = 0
-    #     while tries < 3:
-    #         match, similarity = find_match_with_ollama(query, df, "llama3")
-    #
-    #         if match is not None:
-    #             print(f"\nMatch found!")
-    #             print(f"Incident Number: {match['number']}")
-    #             print(f"Description: {match['short_description']}")
-    #             print(f"Comments: {match['comments']}")
-    #             print(f"Similarity: {similarity:.2f}")
-    #             break
-    #         else:
-    #             print("\nNo match found.")
-    #             additional_info = input("Could you provide more details (e.g., traceId, additional context)? ")
-    #             if not additional_info.strip():
-    #                 print("No additional information provided. Unable to find a match.")
-    #                 break
-    #             query += " " + additional_info
-    #             tries += 1
-    #
-    #     if tries == 3:
-    #         print("\nNo match found after three tries. Creating a new incident...")
-    #         incident_data = {
-    #             "short_description": create_new_incident(file_path, query),
-    #             "comments": "No match found after three attempts."
-    #         }
-    #         response = requests.post("http://localhost:5000/api/create", json=incident_data)
-    #         if response.status_code == 201:
-    #             print("Incident successfully created on the server.")
-    #         else:
-    #             print(f"Failed to create incident. Server responded with status code {response.status_code}.")
+@tool
+def list_columns(_: str = "") -> list:
+    """List CSV columns."""
+    return df.columns.tolist()
 
 
-if __name__ == '__main__':
-    main()
+tools = [get_incident_by_id, semantic_search, list_columns]
+
+
+# ============================================================
+# LLM + AGENT WITH MEMORY
+# ============================================================
+
+llm = ChatOllama(model="gpt-oss:20b", temperature=0)
+
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system",
+         "You are an AI Incident Analysis Assistant.\n"
+         "You always use tools to fetch incident data.\n"
+         "You remember prior conversation context.\n"
+         "If the user refers to 'that incident', you infer it from chat history.\n"
+         "Never hallucinate incident details."
+         "If you find any incident, give the user url http:127.0.0.1:5000/incident/numberOfIncident just one link"
+         "Be a little bit less verbose, just a short analysis and that should be it, or print multiple incidents if they are similar"
+         "Use emojis when it's the case and format the text in a beautiful way to be displayed in UI"
+         "If you find an incident, ADD some incidents in the response that are similar with it"
+         "Please calculate confidence score and show at the end of the output based on the similarity score you have"
+        ),
+        ("human", "{chat_history}\nUser: {input}"),
+        ("placeholder", "{agent_scratchpad}")
+    ]
+)
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+
+# ============================================================
+# MAIN LOOP WITH MEMORY
+# ============================================================
+
+# def main():
+#     print("\nIncident Assistant running with MEMORY enabled.\n")
+#
+#     history = ""  # text format works best for gpt-oss models
+#
+#     while True:
+#         user_input = input("You: ")
+#         if user_input.lower() in {"exit", "quit"}:
+#             break
+#
+#         result = executor.invoke({
+#             "input": user_input,
+#             "chat_history": history
+#         })
+#
+#         answer = result["output"]
+#
+#         print("\nAssistant:", answer, "\n")
+#
+#         # Append for context
+#         history += f"\nUser: {user_input}\nAssistant: {answer}\n"
+
+
+history = ""  # text format works best for gpt-oss models
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    global history
+
+    try:
+        # Get JSON data from the request
+        data = request.get_json()
+        user_input = data.get('input', '')
+
+        print(history)
+
+        if not user_input:
+            return jsonify({"error": "Input is required"}), 400
+
+        # Process the input using the model
+        result = executor.invoke({
+            "input": user_input,
+            "chat_history": history  # Optional chat history
+        })
+
+        # Extract the model's response
+        response = result.get("output", "No response generated")
+
+        history += f"\nUser: {user_input}\nAssistant: {response}\n"
+
+        # Return the response as JSON
+        return jsonify({"response": response})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5001)
