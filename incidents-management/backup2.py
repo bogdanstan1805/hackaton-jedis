@@ -3,7 +3,7 @@ import numpy as np
 import requests
 from langchain_ollama import ChatOllama
 
-EMBEDDINGS_CSV = "incidents.csv"
+EMBEDDINGS_CSV = "incidents_backup.csv"
 EMBED_MODEL = "nomic-embed-text"
 LLM_MODEL = "gemma3:1b"
 OLLAMA_URL = "http://localhost:11434"

@@ -12,8 +12,6 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-
-
 # ============================================================
 # LOAD CSV
 # ============================================================
@@ -97,6 +95,9 @@ prompt = ChatPromptTemplate.from_messages(
          "Never hallucinate incident details."
          "If you find any incident, give the user url http:127.0.0.1:5000/incident/numberOfIncident just one link"
          "Be a little bit less verbose, just a short analysis and that should be it, or print multiple incidents if they are similar"
+         "Use emojis when it's the case and format the text in a beautiful way to be displayed in UI"
+         "If you find an incident, ADD some incidents in the response that are similar with it"
+         "Please calculate confidence score and show at the end of the output based on the similarity score you have"
         ),
         ("human", "{chat_history}\nUser: {input}"),
         ("placeholder", "{agent_scratchpad}")
@@ -134,12 +135,18 @@ executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 #         history += f"\nUser: {user_input}\nAssistant: {answer}\n"
 
 
+history = ""  # text format works best for gpt-oss models
+
 @app.route('/chat', methods=['POST'])
 def chat():
+    global history
+
     try:
         # Get JSON data from the request
         data = request.get_json()
         user_input = data.get('input', '')
+
+        print(history)
 
         if not user_input:
             return jsonify({"error": "Input is required"}), 400
@@ -147,11 +154,13 @@ def chat():
         # Process the input using the model
         result = executor.invoke({
             "input": user_input,
-            "chat_history": data.get('chat_history', '')  # Optional chat history
+            "chat_history": history  # Optional chat history
         })
 
         # Extract the model's response
         response = result.get("output", "No response generated")
+
+        history += f"\nUser: {user_input}\nAssistant: {response}\n"
 
         # Return the response as JSON
         return jsonify({"response": response})

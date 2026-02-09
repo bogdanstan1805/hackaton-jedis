@@ -3,7 +3,7 @@ from langchain_ollama import ChatOllama
 from langchain.tools import tool
 import numpy as np
 
-df = pd.read_csv("incidents.csv")
+df = pd.read_csv("incidents_backup.csv")
 
 # Combine embedding columns into a single vector
 embedding_columns = [col for col in df.columns if col.startswith("emb_")]
