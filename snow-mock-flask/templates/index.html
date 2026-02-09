@@ -1,17 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>Incidents</title>
     <style>
+        @font-face {
+            font-family: Lato-Regular;
+            src: url('../static/assets/fonts/Lato-Regular.ttf') format('truetype');
+        }
+        @font-face {
+            font-family: Lato-Medium;
+            src: url('../static/assets/fonts/Lato-Medium.ttf') format('truetype');
+        }
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
             background-color: #f9f9f9;
+            font-family: Lato-Regular, Arial, sans-serif;
+        }
+        .header,
+        .content{
+            padding: 20px 15px;
+            display: flex;
+
+        }
+        .header {
+            flex-direction: row;
+            justify-content: space-between;
+        }
+        .content {
+            flex-direction: column;
+            justify-content: start;
         }
         h1 {
+            font-family: Lato-Medium, Arial, sans-serif;
+            font-size: 24px;
+            line-height: 1.33;
             color: #333;
+            margin: 0;
+            padding: 7px 0;
+        }
+        a {
+            display: inline-block;
+            text-decoration: none;
+            color: #333;
+            padding: 5px;
+        }
+        a.viewItem > img {
+            width: 20px;
+            height: 100%;
         }
         table {
             width: 100%;
@@ -20,27 +57,38 @@
             background-color: #fff;
         }
         th, td {
-            padding: 10px;
+            padding: 7px 10px;
             text-align: left;
             border: 1px solid #ddd;
         }
         th {
             background-color: #f4f4f4;
+            color: #333;
         }
         tr:nth-child(even) {
             background-color: #f9f9f9;
-            text-decoration: none;
-            color: #007BFF;
         }
-        a:hover {
-            text-decoration: underline;
+        tr:nth-child(odd) {
+            color: #646363;
+        }
+        td.table-actions {
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <h1>Incidents</h1>
-    <table>
-        <thead>
+    <div class='header'>
+        <a class='backBtn' href='{{ url_for('index') }}'>
+            <img src='../static/assets/images/Arrow-Left.svg' style='display: none;'>
+        </a>
+        <h1>Incidents DevOps</h1>
+        <a class='' href=''>
+            <img src='../static/assets/images/Light-Bulb-Filled.svg'>
+        </a>
+    </div>
+    <div class='content'>
+        <table>
+            <thead>
             <tr>
                 <th>Number</th>
                 <th>Short Description</th>
@@ -48,18 +96,23 @@
                 <th>Assignment Group</th>
                 <th>Actions</th>
             </tr>
-        </thead>
-        <tbody>
+            </thead>
+            <tbody>
             {% for incident in incidents %}
             <tr>
                 <td>{{ incident.number }}</td>
                 <td>{{ incident.short_description }}</td>
                 <td>{{ incident.priority }}</td>
                 <td>{{ incident.assignment_group }}</td>
-                <td><a href="{{ url_for('view_incident', number=incident.number) }}">View</a></td>
+                <td class='table-actions'>
+                    <a class='viewItem' href='{{ url_for('view_incident', number=incident.number) }}'>
+                        <img src='../static/assets/images/Magnifying-Glass.svg'>
+                    </a>
+                </td>
             </tr>
             {% endfor %}
-        </tbody>
-    </table>
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
