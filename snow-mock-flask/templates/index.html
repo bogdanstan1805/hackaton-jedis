@@ -18,17 +18,17 @@
             background-color: #f9f9f9;
             font-family: Lato-Regular, Arial, sans-serif;
         }
-        .header,
-        .content{
+        header,
+        main{
             padding: 20px 15px;
             display: flex;
 
         }
-        .header {
+        header {
             flex-direction: row;
             justify-content: space-between;
         }
-        .content {
+        main {
             flex-direction: column;
             justify-content: start;
         }
@@ -77,7 +77,7 @@
     </style>
 </head>
 <body>
-    <div class='header'>
+    <header>
         <a class='backBtn' href='{{ url_for('index') }}'>
             <img src='../static/assets/images/Arrow-Left.svg' style='display: none;'>
         </a>
@@ -85,8 +85,8 @@
         <a class='' href=''>
             <img src='../static/assets/images/Light-Bulb-Filled.svg'>
         </a>
-    </div>
-    <div class='content'>
+    </header>
+    <main>
         <table>
             <thead>
             <tr>
@@ -102,7 +102,7 @@
             <tr>
                 <td>{{ incident.number }}</td>
                 <td>{{ incident.short_description }}</td>
-                <td>{{ incident.priority }}</td>
+                <td>{{ incident.priority.split('.')[0] }}</td>
                 <td>{{ incident.assignment_group }}</td>
                 <td class='table-actions'>
                     <a class='viewItem' href='{{ url_for('view_incident', number=incident.number) }}'>
@@ -113,6 +113,6 @@
             {% endfor %}
             </tbody>
         </table>
-    </div>
+    </main>
 </body>
 </html>

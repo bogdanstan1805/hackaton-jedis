@@ -18,17 +18,17 @@
             background-color: #f9f9f9;
             font-family: Lato-Regular, Arial, sans-serif;
         }
-        .header,
-        .content{
+        header,
+        main {
             padding: 20px 15px;
             display: flex;
 
         }
-        .header {
+        header {
             flex-direction: row;
             justify-content: space-between;
         }
-        .content {
+        main {
             flex-direction: column;
             justify-content: start;
         }
@@ -74,7 +74,7 @@
     </style>
 </head>
 <body>
-    <div class='header'>
+    <header>
         <a class='backBtn' href='{{ url_for('index') }}'>
             <img src='../static/assets/images/Arrow-Left.svg'>
         </a>
@@ -82,8 +82,8 @@
         <a class='' href=''>
             <img src='../static/assets/images/Light-Bulb-Filled.svg'>
         </a>
-    </div>
-    <div class='content'>
+    </header>
+    <main>
         <table>
             <thead>
             <tr>
@@ -100,7 +100,6 @@
             {% endfor %}
             </tbody>
         </table>
-    </div>
-
+    </main>
 </body>
 </html>
