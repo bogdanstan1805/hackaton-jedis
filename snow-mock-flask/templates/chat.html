@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat UI</title>
+    <!-- Marked.js for Markdown → HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         @font-face {
             font-family: Lato-Regular;
@@ -99,13 +101,73 @@
             width: 100%;
             font-size: 15px;
             line-height: 1.6;
-            white-space: pre-wrap;
         }
-        .assistant-content {
+
+        /* ===== Markdown rendered content inside assistant bubble ===== */
+        .assistant-bubble p {
+            margin: 6px 0;
+        }
+        .assistant-bubble strong {
+            font-family: Lato-Medium, Arial, sans-serif;
+        }
+        .assistant-bubble a {
+            color: #007bff;
+            text-decoration: underline;
+            padding: 0;
+            font-weight: bold;
+        }
+        .assistant-bubble a:hover {
+            color: #0056b3;
+        }
+        .assistant-bubble ul,
+        .assistant-bubble ol {
+            padding-left: 20px;
+            margin: 6px 0;
+        }
+        .assistant-bubble li {
+            margin-bottom: 4px;
+        }
+
+        /* Markdown tables */
+        .assistant-bubble table {
             width: 100%;
-            font-size: 15px;
-            line-height: 1.6;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 13px;
         }
+        .assistant-bubble th {
+            background-color: #f0f4f8;
+            font-family: Lato-Medium, Arial, sans-serif;
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 2px solid #ddd;
+        }
+        .assistant-bubble td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .assistant-bubble tr:hover td {
+            background-color: #f9fbfd;
+        }
+
+        /* Code blocks */
+        .assistant-bubble code {
+            background: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        .assistant-bubble pre {
+            background: #f0f0f0;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .assistant-bubble pre code {
+            background: none;
+            padding: 0;
+        }
+
         .incident-card {
             margin-top: 15px;
         }
@@ -217,6 +279,17 @@
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-btn');
 
+        // Configure marked for GFM tables and line breaks
+        marked.setOptions({
+            breaks: true,
+            gfm: true
+        });
+
+        // Convert Markdown text → HTML
+        function renderMarkdown(text) {
+            return marked.parse(text);
+        }
+
         // Add a message bubble to the chat
         function addMessage(content, isUser = true) {
             const wrapper = document.createElement('div');
@@ -225,11 +298,11 @@
             const bubble = document.createElement('div');
             bubble.classList.add(isUser ? 'user-bubble' : 'assistant-bubble');
 
-            // For assistant messages, allow HTML (links, formatting, emojis)
             if (isUser) {
                 bubble.textContent = content;
             } else {
-                bubble.innerHTML = content;
+                // Parse Markdown → HTML for assistant messages
+                bubble.innerHTML = renderMarkdown(content);
             }
 
             wrapper.appendChild(bubble);
@@ -237,17 +310,20 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        // On page load: render any Jinja-injected assistant message as Markdown
+        (function renderInitialAssistantMessage() {
+            const el = document.getElementById('assistant-response');
+            if (el && el.textContent.trim()) {
+                el.innerHTML = renderMarkdown(el.textContent);
+            }
+        })();
+
         // Show typing indicator
         function showTyping() {
             const wrapper = document.createElement('div');
             wrapper.classList.add('message-wrapper', 'assistant-wrapper');
             wrapper.id = 'typing-indicator';
-
-            wrapper.innerHTML = `
-                <div class="typing-indicator">
-                    <span></span><span></span><span></span>
-                </div>
-            `;
+            wrapper.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
             chatContainer.appendChild(wrapper);
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
@@ -274,23 +350,23 @@
                     body: JSON.stringify({ message: userMessage })
                 });
 
-                // Backend returns rendered HTML — parse it to extract the assistant message
+                // Backend returns rendered HTML (Jinja) — parse it to extract the raw text
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
 
                 hideTyping();
 
-                // Find the assistant response element in the rendered HTML
+                // Extract the raw Markdown text from the Jinja-rendered element
                 const assistantEl = doc.getElementById('assistant-response');
 
                 if (assistantEl) {
-                    addMessage(assistantEl.innerHTML, false);
+                    // .textContent gets the raw Markdown, then we render it client-side
+                    addMessage(assistantEl.textContent, false);
                 } else {
-                    // Fallback: try to find any assistant-bubble
                     const bubbles = doc.querySelectorAll('.assistant-bubble');
                     if (bubbles.length > 0) {
-                        addMessage(bubbles[bubbles.length - 1].innerHTML, false);
+                        addMessage(bubbles[bubbles.length - 1].textContent, false);
                     } else {
                         addMessage('No response from assistant.', false);
                     }
