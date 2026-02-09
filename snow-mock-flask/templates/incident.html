@@ -1,17 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <title>Incident Details</title>
     <style>
+        @font-face {
+            font-family: Lato-Regular;
+            src: url('../static/assets/fonts/Lato-Regular.ttf') format('truetype');
+        }
+        @font-face {
+            font-family: Lato-Medium;
+            src: url('../static/assets/fonts/Lato-Medium.ttf') format('truetype');
+        }
         body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
+            margin: 0;
             background-color: #f9f9f9;
+            font-family: Lato-Regular, Arial, sans-serif;
+        }
+        .header,
+        .content{
+            padding: 20px 15px;
+            display: flex;
+
+        }
+        .header {
+            flex-direction: row;
+            justify-content: space-between;
+        }
+        .content {
+            flex-direction: column;
+            justify-content: start;
         }
         h1 {
+            font-family: Lato-Medium, Arial, sans-serif;
+            font-size: 24px;
+            line-height: 1.33;
             color: #333;
+            margin: 0;
+            padding: 7px 0;
+        }
+        a {
+            display: inline-block;
+            text-decoration: none;
+            color: #333;
+            padding: 5px;
+        }
+        a.backBtn > img {
+            width: 32px;
+            height: 100%;
         }
         table {
             width: 100%;
@@ -20,45 +57,50 @@
             background-color: #fff;
         }
         th, td {
-            padding: 10px;
+            padding: 7px 10px;
             text-align: left;
             border: 1px solid #ddd;
         }
         th {
             background-color: #f4f4f4;
+            color: #333;
         }
         tr:nth-child(even) {
             background-color: #f9f9f9;
         }
-        a {
-            display: inline-block;
-            margin-top: 20px;
-            text-decoration: none;
-            color: #007BFF;
-        }
-        a:hover {
-            text-decoration: underline;
+        tr:nth-child(odd) {
+            color: #646363;
         }
     </style>
 </head>
 <body>
-    <h1>Incident Details</h1>
-    <table>
-        <thead>
+    <div class='header'>
+        <a class='backBtn' href='{{ url_for('index') }}'>
+            <img src='../static/assets/images/Arrow-Left.svg'>
+        </a>
+        <h1>Incident DevOps - {{ incident.number }}</h1>
+        <a class='' href=''>
+            <img src='../static/assets/images/Light-Bulb-Filled.svg'>
+        </a>
+    </div>
+    <div class='content'>
+        <table>
+            <thead>
             <tr>
                 <th>Field</th>
                 <th>Value</th>
             </tr>
-        </thead>
-        <tbody>
+            </thead>
+            <tbody>
             {% for key, value in incident.items() %}
             <tr>
                 <td><strong>{{ key }}</strong></td>
                 <td>{{ value }}</td>
             </tr>
             {% endfor %}
-        </tbody>
-    </table>
-    <a href="{{ url_for('index') }}">Back to Incidents</a>
+            </tbody>
+        </table>
+    </div>
+
 </body>
 </html>
