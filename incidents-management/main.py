@@ -1,40 +1,42 @@
 import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-
 from ollama import Client
+
 from langchain_ollama import ChatOllama
 from langchain.tools import tool
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from langchain_classic.prompts import ChatPromptTemplate
 
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+
+
 # ============================================================
-# LOAD CSV & PREPARE EMBEDDINGS
+# LOAD CSV
 # ============================================================
 
 df = pd.read_csv("incidents.csv")
-
-# Identify all embedding columns automatically
 emb_cols = [c for c in df.columns if c.startswith("emb_")]
 EMB_DIM = len(emb_cols)
-print(f"Detected {EMB_DIM} embedding dimensions.")
-
-# Convert embeddings to matrix
 emb_matrix = df[emb_cols].to_numpy(dtype=np.float32)
 
 
 # ============================================================
-# OLLAMA CLIENT FOR QUERY EMBEDDINGS (nomic-embed-text)
+# EMBEDDING CLIENT
 # ============================================================
 
 client = Client()
-EMBED_MODEL = "nomic-embed-text"  # must match your original model
+EMBED_MODEL = "nomic-embed-text"
+
 
 def embed_query(text: str) -> np.ndarray:
     resp = client.embeddings(model=EMBED_MODEL, prompt=text)
     vec = np.array(resp["embedding"], dtype=np.float32)
     if vec.shape[0] != EMB_DIM:
-        raise ValueError(f"Embedding dim mismatch: query={vec.shape[0]}, csv={EMB_DIM}")
+        raise ValueError("Embedding dimension mismatch")
     return vec.reshape(1, -1)
 
 
@@ -44,7 +46,7 @@ def embed_query(text: str) -> np.ndarray:
 
 @tool
 def get_incident_by_id(incident_number: str) -> dict:
-    """Return a single incident by its 'number' column."""
+    """Return an incident based on its 'number' column."""
     row = df[df["number"].astype(str) == incident_number]
     if row.empty:
         return {"error": f"Incident {incident_number} not found"}
@@ -53,30 +55,26 @@ def get_incident_by_id(incident_number: str) -> dict:
 
 @tool
 def semantic_search(query: str, k: int = 5) -> list:
-    """Return the top-k semantically related incidents using embeddings."""
+    """Semantic search over incident embeddings."""
     qvec = embed_query(query)
     sims = cosine_similarity(qvec, emb_matrix)[0]
-
     top_idx = np.argsort(-sims)[:k]
 
-    output = []
-    for i in top_idx:
-        item = {
+    return [
+        {
             "number": str(df.iloc[i]["number"]),
             "short_description": df.iloc[i].get("short_description", ""),
-            "assignment_group": df.iloc[i].get("assignment_group", ""),
             "priority": int(df.iloc[i].get("priority", -1)),
+            "assignment_group": df.iloc[i].get("assignment_group", ""),
             "similarity": float(sims[i]),
-            "description": df.iloc[i].get("description", "")
         }
-        output.append(item)
-
-    return output
+        for i in top_idx
+    ]
 
 
 @tool
 def list_columns(_: str = "") -> list:
-    """Return list of CSV columns."""
+    """List CSV columns."""
     return df.columns.tolist()
 
 
@@ -84,47 +82,83 @@ tools = [get_incident_by_id, semantic_search, list_columns]
 
 
 # ============================================================
-# LLM WITH AGENT (NO STREAMING — REQUIRED FOR gpt-oss:20b)
+# LLM + AGENT WITH MEMORY
 # ============================================================
 
-llm = ChatOllama(
-    model="gpt-oss:20b",
-    temperature=0
-)
+llm = ChatOllama(model="gpt-oss:20b", temperature=0)
 
 prompt = ChatPromptTemplate.from_messages(
     [
         ("system",
-         "You are an AI Incident Analysis Assistant. "
-         "Use the available tools ONLY to answer questions about incidents. "
-         "Use semantic_search for natural-language queries. "
-         "Use get_incident_by_id when the user provides an incident number. "
-         "Do NOT hallucinate incident data."
+         "You are an AI Incident Analysis Assistant.\n"
+         "You always use tools to fetch incident data.\n"
+         "You remember prior conversation context.\n"
+         "If the user refers to 'that incident', you infer it from chat history.\n"
+         "Never hallucinate incident details."
+         "If you find any incident, give the user url http:127.0.0.1:5000/incident/numberOfIncident just one link"
+         "Be a little bit less verbose, just a short analysis and that should be it, or print multiple incidents if they are similar"
         ),
-        ("human", "{input}"),
+        ("human", "{chat_history}\nUser: {input}"),
         ("placeholder", "{agent_scratchpad}")
     ]
 )
 
 agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
 
 # ============================================================
-# MAIN LOOP
+# MAIN LOOP WITH MEMORY
 # ============================================================
 
-def main():
-    print("\nAI Incident Assistant ready. Type 'exit' to quit.\n")
+# def main():
+#     print("\nIncident Assistant running with MEMORY enabled.\n")
+#
+#     history = ""  # text format works best for gpt-oss models
+#
+#     while True:
+#         user_input = input("You: ")
+#         if user_input.lower() in {"exit", "quit"}:
+#             break
+#
+#         result = executor.invoke({
+#             "input": user_input,
+#             "chat_history": history
+#         })
+#
+#         answer = result["output"]
+#
+#         print("\nAssistant:", answer, "\n")
+#
+#         # Append for context
+#         history += f"\nUser: {user_input}\nAssistant: {answer}\n"
 
-    while True:
-        user_input = input("You: ").strip()
-        if user_input.lower() in {"exit", "quit"}:
-            break
 
-        result = agent_executor.invoke({"input": user_input})
-        print("\nAssistant:", result["output"], "\n")
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        # Get JSON data from the request
+        data = request.get_json()
+        user_input = data.get('input', '')
+
+        if not user_input:
+            return jsonify({"error": "Input is required"}), 400
+
+        # Process the input using the model
+        result = executor.invoke({
+            "input": user_input,
+            "chat_history": data.get('chat_history', '')  # Optional chat history
+        })
+
+        # Extract the model's response
+        response = result.get("output", "No response generated")
+
+        # Return the response as JSON
+        return jsonify({"response": response})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True, port=5001)
