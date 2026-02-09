@@ -96,7 +96,7 @@ prompt = ChatPromptTemplate.from_messages(
          "If you find any incident, give the user url http:127.0.0.1:5000/incident/numberOfIncident just one link"
          "Be a little bit less verbose, just a short analysis and that should be it, or print multiple incidents if they are similar"
          "Use emojis when it's the case and format the text in a beautiful way to be displayed in UI"
-         "If you find an incident, ADD some incidents in the response that are similar with it"
+         "If you find an incident, ADD some incidents in the response that are similar with it, don't give similar incidents every time"
          "Please calculate confidence score and show at the end of the output based on the similarity score you have"
         ),
         ("human", "{chat_history}\nUser: {input}"),
