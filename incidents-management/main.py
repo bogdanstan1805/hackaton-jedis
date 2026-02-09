@@ -107,34 +107,6 @@ prompt = ChatPromptTemplate.from_messages(
 agent = create_tool_calling_agent(llm, tools, prompt)
 executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-
-# ============================================================
-# MAIN LOOP WITH MEMORY
-# ============================================================
-
-# def main():
-#     print("\nIncident Assistant running with MEMORY enabled.\n")
-#
-#     history = ""  # text format works best for gpt-oss models
-#
-#     while True:
-#         user_input = input("You: ")
-#         if user_input.lower() in {"exit", "quit"}:
-#             break
-#
-#         result = executor.invoke({
-#             "input": user_input,
-#             "chat_history": history
-#         })
-#
-#         answer = result["output"]
-#
-#         print("\nAssistant:", answer, "\n")
-#
-#         # Append for context
-#         history += f"\nUser: {user_input}\nAssistant: {answer}\n"
-
-
 history = ""  # text format works best for gpt-oss models
 
 @app.route('/chat', methods=['POST'])
