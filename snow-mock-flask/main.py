@@ -61,7 +61,6 @@ def chat():
         response.raise_for_status()  # Raise an error for HTTP errors
         assistant_response = response.json().get('response', 'No response from assistant')
 
-        print("milsugi" + assistant_response)
         # Render the chat page with the user input and assistant response
         return render_template('chat.html', userMessage=user_input, assistantMessage=assistant_response)
     except requests.RequestException as e:
