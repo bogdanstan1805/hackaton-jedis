@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat UI</title>
+    <style>
+        @font-face {
+            font-family: Lato-Regular;
+            src: url('../static/assets/fonts/Lato-Regular.ttf') format('truetype');
+        }
+        @font-face {
+            font-family: Lato-Medium;
+            src: url('../static/assets/fonts/Lato-Medium.ttf') format('truetype');
+        }
+        body {
+            font-family: Lato-Regular, Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            color: #333;
+        }
+        header,
+        main {
+            padding: 20px 15px;
+            display: flex;
+
+        }
+        header {
+            flex-direction: row;
+            justify-content: space-between;
+            box-shadow: 0 1px 5px 0 #00000033;
+        }
+        .sticky{
+            position: sticky;   /* makes it stick */
+            top: 0;             /* sticks to the top */
+            background-color: #fff;
+            padding: 15px 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 999;       /* keeps it above content */
+        }
+        main {
+            flex-direction: column;
+            justify-content: start;
+        }
+        h1 {
+            font-family: Lato-Medium, Arial, sans-serif;
+            font-size: 24px !important;
+            line-height: 1.33;
+            color: #333;
+            margin: 0;
+            padding: 7px 0;
+        }
+        a {
+            display: inline-block;
+            text-decoration: none;
+            color: #333;
+            padding: 5px;
+        }
+        a.viewMore > img {
+            width: 20px;
+            height: 100%;
+        }
+
+        /* Chat Window */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 10px 10px 20px;
+        }
+        .message-wrapper {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* User Message Styling */
+        .user-wrapper {
+            align-items: flex-end;
+        }
+        .user-bubble {
+            background-color: #CFE4F4;
+            padding: 12px 18px;
+            border-radius: 18px;
+            max-width: 80%;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #2c3e50;
+        }
+
+        /* Assistant Message Styling */
+        .assistant-wrapper {
+            align-items: flex-start;
+            border-bottom: 1px solid #E8E8E8;
+            padding-bottom: 15px;
+        }
+        .assistant-content {
+            width: 100%;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+        .incident-card {
+            margin-top: 15px;
+        }
+        .incident-card > a {
+            padding: 0;
+        }
+        .incident-id {
+            color: #007bff;
+            font-weight: bold;
+            text-decoration: none;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px;
+        }
+        .input-wrapper {
+            background: #fff;
+            border-radius: 28px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 1px solid #E8E8E8;
+        }
+        .input-wrapper input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px;
+            outline: none;
+            font-size: 15px;
+        }
+        .icon-btn {
+            color: #888;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        .send-btn {
+            background-color: #EBEBEA;
+            color: #646363;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <header class="sticky">
+        <a class='' href=''>
+            <img src='../static/assets/images/Light-Bulb-Filled.svg'>
+        </a>
+        <h1>SNOW Incident Assistant</h1>
+        <a class='viewMore' href=''>
+            <img src='../static/assets/images/3-dots.svg'>
+        </a>
+    </header>
+
+    <div class="chat-container">
+        <div class="message-wrapper user-wrapper">
+            <div class="user-bubble">
+                we have a problem with a TPP RetailPay, we receive reports mTLS handshake failure on POST /v1/psd2/token.
+            </div>
+        </div>
+        <div class="message-wrapper assistant-wrapper">
+            <div class="assistant-content">
+                Ok, let’s take it step by step.<br>
+                I don’t find an incident opened in the last 3 hours in this topic.<br><br>
+                Let’s try to gather more information, to be able to be more precise in our search.<br><br>
+                1. Do we know who is the caller of the endpoint?<br>
+                2. To be able to establish the severity of this issue, I would need to know how many calls have been failing in the past 24h / 12h / last hour.<br>
+                3. Do you have a traceId that I could search for?
+            </div>
+        </div>
+        <div class="message-wrapper user-wrapper">
+            <div class="user-bubble">the caller is unknown</div>
+        </div>
+        <div class="message-wrapper user-wrapper">
+            <div class="user-bubble">Around 1000 calls are failing in the last 5 minutes.</div>
+        </div>
+        <div class="message-wrapper assistant-wrapper">
+            <div class="assistant-content">
+                I found 2 recent incidents on the same topic.<br><br>
+
+                <div class="incident-card">
+                    <a href="#" class="incident-id">INC0013012</a>
+                    TPP WalletX is experiencing mTLS handshake failure (unknown_ca) when calling POST /v1/psd2/token.<br>
+                    <b>Duration until fixed:</b> 30 minutes.<br>
+                    <b>Root cause:</b> The TPP renewed the certificate without onboarding it.<br>
+                    <b>Resolution:</b> Correlating the TLS details and TPP IDs.
+                </div>
+
+                <div class="incident-card">
+                    <a href="#" class="incident-id">INC0013019</a>
+                    TPP mTLS handshake failure (unknown_ca) on POST /v1/psd2/token for FinTechOne.<br>
+                    <b>Duration until fixed:</b> 2 hours.<br>
+                    <b>Root cause:</b> TPP had the certificate expired.<br>
+                    <b>Resolution:</b> The TPP needed to renew the certificate and then onboard it.
+                </div>
+
+                <p>If you don’t find this information helpful enough, I could try doing a deep search.<br>
+                    Please provide me the following information:</p>
+                <ul>
+                    <li>traceId;</li>
+                    <li>Exact time interval in which the problem occured.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <span class="icon-btn">📎</span>
+            <input type="text" placeholder="How can I help?">
+            <div class="send-btn">↑</div>
+        </div>
+    </div>
+</body>
+</html>
